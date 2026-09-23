@@ -1,5 +1,5 @@
 -- ============================================
--- Auto-Restart Timer on "No" & 1B+ Chat Finder
+-- Fixed Server Hop & Precise Game Timer & Auto-Resume
 -- Steal an Egg! - Delta Executor
 -- ============================================
 
@@ -12,18 +12,17 @@ local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- قائمة أسماء الحيوانات النادرة (1B+)
+-- قائمة الكلمات والحيوانات النادرة
 local HighTier1BPets = {
     "aetheron", "archangel", "world burner", "nightflame", 
-    "kitsune", "unicorn", "shattered colossus", "dreadscale", "equinox"
+    "kitsune", "unicorn", "shattered colossus", "dreadscale", "equinox", "gargoyle"
 }
 
--- الكلمات المفتاحية لتنبيهات الشات
 local RareSpawnKeywords = {
-    "spawn", "eternal", "divine", "secret", "1b"
+    "spawn", "eternal", "divine", "secret", "1b", "gargoyle"
 }
 
-local guiName = "Delta_ExactTimer_1B_UI"
+local guiName = "Delta_ExactTimer_1B_UI_V2"
 local parentGui = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
 if parentGui:FindFirstChild(guiName) then
@@ -80,7 +79,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -10, 0, 30)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "صايد 1B+ (عداد دقيق 100%) 💎"
+titleLabel.Text = "صايد 1B+ (معدّل ومضمون) 💎"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -92,7 +91,7 @@ statusLabel.Size = UDim2.new(0.92, 0, 0, 55)
 statusLabel.Position = UDim2.new(0.04, 0, 0.26, 0)
 statusLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
 statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
-statusLabel.Text = "⏱️ جاري جلب عداد اللعبة..."
+statusLabel.Text = "⏱️ جاري جلب العداد وتجهيز السيرفر..."
 statusLabel.TextSize = 13
 statusLabel.TextWrapped = true
 statusLabel.Font = Enum.Font.SourceSansBold
@@ -120,96 +119,118 @@ toggleBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = not mainFrame.Visible
 end)
 
--- تنفيذ الانتقال
-local function executeTeleport(targetJobId)
-    local queueFunc = queue_on_teleport or syn.queue_on_teleport or queueonteleport
-    if queueFunc then
-        queueFunc(string.format('loadstring(game:HttpGet("%s"))()', github_raw_url))
-    end
-    
-    if targetJobId then
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, targetJobId, LocalPlayer)
-    else
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
-    end
-end
-
--- دالة التنقل بين السيرفرات
+-- دالة التنقل المضمونة بين السيرفرات (تمنع التكرار)
 local function serverHop()
-    statusLabel.Text = "🔄 جاري البحث عن سيرفر جديد..."
+    statusLabel.Text = "🔄 جاري البحث عن سيرفر جديد مختلف..."
     statusLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
     
     task.spawn(function()
         local placeId = game.PlaceId
         local currentJobId = game.JobId
-        local success, result = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet("https://games.roproxy.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"))
-        end)
+        local foundServer = nil
+        local cursor = ""
+        
+        -- البحث في عدة صفحات حتى نجد سيرفر مختلف
+        for attempt = 1, 3 do
+            local url = "https://games.roproxy.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
+            if cursor ~= "" then
+                url = url .. "&cursor=" .. cursor
+            end
+            
+            local success, result = pcall(function()
+                return HttpService:JSONDecode(game:HttpGet(url))
+            end)
 
-        local targetServer = nil
-        if success and result and result.data then
-            local validServers = {}
-            for _, s in ipairs(result.data) do
-                if type(s) == "table" and s.id ~= currentJobId and s.playing < s.maxPlayers then
-                    table.insert(validServers, s.id)
+            if success and result and result.data then
+                local validServers = {}
+                for _, s in ipairs(result.data) do
+                    if type(s) == "table" and s.id ~= currentJobId and s.playing and s.maxPlayers and s.playing < s.maxPlayers then
+                        table.insert(validServers, s.id)
+                    end
+                end
+                if #validServers > 0 then
+                    foundServer = validServers[math.random(1, #validServers)]
+                    break
+                end
+                if result.nextPageCursor then
+                    cursor = result.nextPageCursor
+                else
+                    break
                 end
             end
-            if #validServers > 0 then
-                targetServer = validServers[math.random(1, #validServers)]
-            end
+            task.wait(0.3)
         end
 
-        executeTeleport(targetServer)
+        local queueFunc = queue_on_teleport or syn.queue_on_teleport or queueonteleport
+        if queueFunc then
+            queueFunc(string.format('loadstring(game:HttpGet("%s"))()', github_raw_url))
+        end
+
+        if foundServer then
+            TeleportService:TeleportToPlaceInstance(placeId, foundServer, LocalPlayer)
+        else
+            TeleportService:Teleport(placeId, LocalPlayer)
+        end
     end)
 end
 
 manualHopBtn.MouseButton1Click:Connect(serverHop)
 
--- دالة قراءة الوقت المتبقي المباشر من واجهة اللعبة
+-- دالة جلب العداد المباشر بدون القراءات الصفرية الخاطئة
 local function getExactGameTimeLeft()
+    local maxTimeFound = 0
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    
     if playerGui then
         for _, guiElement in ipairs(playerGui:GetDescendants()) do
-            if guiElement:IsA("TextLabel") or guiElement:IsA("TextButton") then
+            if (guiElement:IsA("TextLabel") or guiElement:IsA("TextButton")) and guiElement.Visible then
                 local txt = guiElement.Text
+                -- البحث عن صيغ الوقت مثل "in 4m 43s" أو "4m 43s"
                 local m, s = string.match(txt, "(%d+)m%s*(%d+)s")
                 if m and s then
-                    return tonumber(m) * 60 + tonumber(s)
-                end
-                local m2, s2 = string.match(txt, "(%d+):(%d+)")
-                if m2 and s2 and tonumber(m2) <= 5 then
-                    return tonumber(m2) * 60 + tonumber(s2)
+                    local totalSecs = tonumber(m) * 60 + tonumber(s)
+                    if totalSecs > maxTimeFound then
+                        maxTimeFound = totalSecs
+                    end
                 end
             end
         end
     end
 
+    if maxTimeFound > 0 then
+        return maxTimeFound
+    end
+
+    -- احتياطي حساب الوقت عبر السيرفر بدقة 5 دقائق (300 ثانية)
     local serverTime = math.floor(Workspace:GetServerTimeNow())
-    return 300 - (serverTime % 300)
+    local rem = 300 - (serverTime % 300)
+    return rem
 end
 
--- دالة الفحص عبر الشات وأسماء المجسمات فقط
+-- دالة فحص الماب والشات
 local function check1BPetAccurate()
+    -- 1. فحص الشات والرسائل على الشاشة
+    local chatGui = LocalPlayer.PlayerGui:FindFirstChild("Chat") or CoreGui:FindFirstChild("Chat") or LocalPlayer.PlayerGui:FindFirstChild("MainGui")
+    if chatGui then
+        for _, label in ipairs(chatGui:GetDescendants()) do
+            if label:IsA("TextLabel") and label.Visible then
+                local txt = string.lower(label.Text)
+                for _, kw in ipairs(RareSpawnKeywords) do
+                    if string.find(txt, kw) then
+                        return "تنبيه الشات/الشاشة: " .. label.Text
+                    end
+                end
+            end
+        end
+    end
+
+    -- 2. فحص المجسمات على الأرض
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") or obj:IsA("BasePart") then
             local objName = string.lower(obj.Name)
             for _, petName in ipairs(HighTier1BPets) do
                 if string.find(objName, petName) then
-                    return "الحيوان: " .. obj.Name
-                end
-            end
-        end
-    end
-
-    local chatGui = LocalPlayer.PlayerGui:FindFirstChild("Chat") or CoreGui:FindFirstChild("Chat")
-    if chatGui then
-        for _, label in ipairs(chatGui:GetDescendants()) do
-            if label:IsA("TextLabel") then
-                local txt = string.lower(label.Text)
-                for _, kw in ipairs(RareSpawnKeywords) do
-                    if string.find(txt, kw) then
-                        return "الشات: " .. label.Text
-                    end
+                    return "مجسم في الماب: " .. obj.Name
                 end
             end
         end
@@ -218,7 +239,7 @@ local function check1BPetAccurate()
     return nil
 end
 
--- نافذة السؤال المنبثقة للـ Server Hop
+-- نافذة السؤال المنبثقة عند عدم وجود رسبون
 local function showPrompt()
     local promptFrame = Instance.new("Frame")
     promptFrame.Name = "PromptFrame"
@@ -306,16 +327,20 @@ local function showPrompt()
         end
     end)
 
-    repeat task.wait(0.2) until userChoice ~= nil
+    repeat task.wait(0.1) until userChoice ~= nil
     return userChoice
 end
 
--- الحلقة الرئيسية التكرارية التي تعمل بدون توقف عند البقاء
+-- الحلقة الرئيسية التكرارية
 task.spawn(function()
+    -- انتظار تحميل واجهة اللاعب
+    task.wait(2)
+    
     while true do
         local timeLeft = getExactGameTimeLeft()
         
-        while timeLeft > 1 do
+        -- العداد التنازلي الحقيقي
+        while timeLeft > 2 do
             timeLeft = getExactGameTimeLeft()
             local mins = math.floor(timeLeft / 60)
             local secs = timeLeft % 60
@@ -324,16 +349,16 @@ task.spawn(function()
             task.wait(0.5)
         end
 
-        statusLabel.Text = "⚡ رسبن الماب الآن! جاري فحص الشات..."
+        statusLabel.Text = "⚡ رسبن الماب الآن! جاري فحص الشات والماب..."
         statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-        task.wait(2.5)
+        task.wait(3) -- انتظار ثوانٍ حتى تكتمل رسالة الرسبون
 
         local foundPet = check1BPetAccurate()
 
         if foundPet then
             statusLabel.Text = "🎉 تم العثور على حيوان نادر!\n" .. foundPet
             statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-            break -- التوقف فقط إذا تم العثور على حيوان نادر بنجاح
+            break
         else
             statusLabel.Text = "❌ لم يترسبن حيوان نادر."
             statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -343,11 +368,12 @@ task.spawn(function()
                 serverHop()
                 break
             else
-                statusLabel.Text = "👍 البقاء بالسيرفر.. جاري استئناف العداد"
+                statusLabel.Text = "👍 تم اختيار البقاء.. جاري استئناف العداد"
                 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-                task.wait(2)
-                -- يستمر Loop تلقائياً للرسبون القادم
+                task.wait(1.5)
+                -- استئناف الدورة التلقائية مجدداً
             end
         end
     end
 end)
+

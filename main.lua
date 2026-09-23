@@ -1,270 +1,353 @@
--- Steal an Egg Mobile Script (Fixed ESP & Smooth Speed)
--- Delta Exec Compatible
+-- ============================================
+-- Auto-Restart Timer on "No" & 1B+ Chat Finder
+-- Steal an Egg! - Delta Executor
+-- ============================================
 
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local github_raw_url = "https://raw.githubusercontent.com/yusifboos999-cmd/..-/refs/heads/main/Main.lua"
 
-local Window = Rayfield:CreateWindow({
-   Name = "Egg Steal Hub 🥚",
-   LoadingTitle = "Loading Advanced Script...",
-   LoadingSubtitle = "by Assistant",
-   ConfigurationSaving = { Enabled = false },
-   KeySystem = false
-})
-
--- Services & Variables
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
-local AntiHitEnabled = false
-local EggESPEnabled = false
-local SpeedEnabled = false
-local SpeedValue = 200
-local MaxDistance = 30 
-
-local ESPObjects = {}
-
--- Rarity Mapping Database
-local RarityDatabase = {
-   -- DIVINE
-   ["unicorn"] = {Rarity = "Divine", Color = Color3.fromRGB(255, 215, 0)},
-   ["kitsune"] = {Rarity = "Divine", Color = Color3.fromRGB(255, 215, 0)},
-   ["nightflame"] = {Rarity = "Divine", Color = Color3.fromRGB(255, 215, 0)},
-   ["archangel"] = {Rarity = "Divine", Color = Color3.fromRGB(255, 215, 0)},
-
-   -- ETERNAL
-   ["eternal lunar dragon"] = {Rarity = "Eternal", Color = Color3.fromRGB(0, 255, 255)},
-   ["pegasus"] = {Rarity = "Eternal", Color = Color3.fromRGB(0, 255, 255)},
-   ["world burner"] = {Rarity = "Eternal", Color = Color3.fromRGB(0, 255, 255)},
-   ["tralaledon"] = {Rarity = "Eternal", Color = Color3.fromRGB(0, 255, 255)},
-
-   -- SECRET
-   ["royal sphinx"] = {Rarity = "Secret", Color = Color3.fromRGB(200, 200, 200)},
-   ["king snake"] = {Rarity = "Secret", Color = Color3.fromRGB(200, 200, 200)},
-   ["mutant shark"] = {Rarity = "Secret", Color = Color3.fromRGB(200, 200, 200)},
-   ["gorilla king"] = {Rarity = "Secret", Color = Color3.fromRGB(200, 200, 200)},
-   ["phoenix"] = {Rarity = "Secret", Color = Color3.fromRGB(200, 200, 200)},
-   ["lava dragon"] = {Rarity = "Secret", Color = Color3.fromRGB(200, 200, 200)},
-
-   -- MYTHIC
-   ["scorpion"] = {Rarity = "Mythic", Color = Color3.fromRGB(255, 0, 50)},
-   ["sand spider"] = {Rarity = "Mythic", Color = Color3.fromRGB(255, 0, 50)},
-   ["cerberus"] = {Rarity = "Mythic", Color = Color3.fromRGB(255, 0, 50)},
-   ["kraken"] = {Rarity = "Mythic", Color = Color3.fromRGB(255, 0, 50)},
-
-   -- LEGENDARY
-   ["snake"] = {Rarity = "Legendary", Color = Color3.fromRGB(255, 170, 0)},
-   ["gorilla"] = {Rarity = "Legendary", Color = Color3.fromRGB(255, 170, 0)},
-   ["spider"] = {Rarity = "Legendary", Color = Color3.fromRGB(255, 170, 0)},
-   ["tiger"] = {Rarity = "Legendary", Color = Color3.fromRGB(255, 170, 0)},
-   ["shark"] = {Rarity = "Legendary", Color = Color3.fromRGB(255, 170, 0)},
-
-   -- EPIC
-   ["crocodile"] = {Rarity = "Epic", Color = Color3.fromRGB(170, 0, 255)},
-   ["bladehide"] = {Rarity = "Epic", Color = Color3.fromRGB(170, 0, 255)},
-   ["rhinotaur"] = {Rarity = "Epic", Color = Color3.fromRGB(170, 0, 255)},
-   ["lava frog"] = {Rarity = "Epic", Color = Color3.fromRGB(170, 0, 255)},
-
-   -- RARE
-   ["fennec"] = {Rarity = "Rare", Color = Color3.fromRGB(0, 150, 255)},
-   ["camel"] = {Rarity = "Rare", Color = Color3.fromRGB(0, 150, 255)},
-   ["chimpanzee"] = {Rarity = "Rare", Color = Color3.fromRGB(0, 150, 255)},
-
-   -- COMMON
-   ["jerboa"] = {Rarity = "Common", Color = Color3.fromRGB(220, 220, 220)},
-   ["toucan"] = {Rarity = "Common", Color = Color3.fromRGB(220, 220, 220)}
+-- قائمة أسماء الحيوانات النادرة (1B+)
+local HighTier1BPets = {
+    "aetheron", "archangel", "world burner", "nightflame", 
+    "kitsune", "unicorn", "shattered colossus", "dreadscale", "equinox"
 }
 
--- UI Tabs
-local MainTab = Window:CreateTab("الرئيسية & السرعة", 4483362458)
+-- الكلمات المفتاحية لتنبيهات الشات
+local RareSpawnKeywords = {
+    "spawn", "eternal", "divine", "secret", "1b"
+}
 
-MainTab:CreateToggle({
-   Name = "تفعيل السرعة الآمنة",
-   CurrentValue = false,
-   Callback = function(Value)
-      SpeedEnabled = Value
-      if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-         LocalPlayer.Character.Humanoid.WalkSpeed = 16
-      end
-   end,
-})
+local guiName = "Delta_ExactTimer_1B_UI"
+local parentGui = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
-MainTab:CreateSlider({
-   Name = "مقدار السرعة",
-   Range = {16, 500},
-   Increment = 10,
-   Suffix = "Speed",
-   CurrentValue = 200,
-   Callback = function(Value)
-      SpeedValue = Value
-   end,
-})
+if parentGui:FindFirstChild(guiName) then
+    parentGui[guiName]:Destroy()
+end
 
--- Safe CFrame Movement (بدون ارتداد أو تعليق)
-RunService.RenderStepped:Connect(function(dt)
-   if SpeedEnabled and LocalPlayer.Character then
-      local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-      local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-      if hum and hrp and hum.MoveDirection.Magnitude > 0 then
-         hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (SpeedValue * dt * 0.8))
-      end
-   end
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = guiName
+screenGui.ResetOnSpawn = false
+screenGui.Parent = parentGui
+
+-- 1. زر التبديل العائم
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "ToggleButton"
+toggleBtn.Size = UDim2.new(0, 45, 0, 45)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.25, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+toggleBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
+toggleBtn.Text = "💎"
+toggleBtn.TextSize = 22
+toggleBtn.Active = true
+toggleBtn.Draggable = true
+toggleBtn.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0, 12)
+toggleCorner.Parent = toggleBtn
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(0, 255, 150)
+toggleStroke.Thickness = 2
+toggleStroke.Parent = toggleBtn
+
+-- 2. الإطار الرئيسي
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 270, 0, 145)
+mainFrame.Position = UDim2.new(0.5, -135, 0.25, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 14)
+frameCorner.Parent = mainFrame
+
+local frameStroke = Instance.new("UIStroke")
+frameStroke.Color = Color3.fromRGB(0, 255, 150)
+frameStroke.Thickness = 2
+frameStroke.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -10, 0, 30)
+titleLabel.Position = UDim2.new(0, 10, 0, 5)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "صايد 1B+ (عداد دقيق 100%) 💎"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 13
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.92, 0, 0, 55)
+statusLabel.Position = UDim2.new(0.04, 0, 0.26, 0)
+statusLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+statusLabel.Text = "⏱️ جاري جلب عداد اللعبة..."
+statusLabel.TextSize = 13
+statusLabel.TextWrapped = true
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 8)
+statusCorner.Parent = statusLabel
+
+local manualHopBtn = Instance.new("TextButton")
+manualHopBtn.Size = UDim2.new(0.92, 0, 0, 32)
+manualHopBtn.Position = UDim2.new(0.04, 0, 0.72, 0)
+manualHopBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 240)
+manualHopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+manualHopBtn.Text = "تغيير السيرفر يدوياً 🔄"
+manualHopBtn.TextSize = 13
+manualHopBtn.Font = Enum.Font.SourceSansBold
+manualHopBtn.Parent = mainFrame
+
+local manualCorner = Instance.new("UICorner")
+manualCorner.CornerRadius = UDim.new(0, 6)
+manualCorner.Parent = manualHopBtn
+
+toggleBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
 end)
 
-MainTab:CreateToggle({
-   Name = "Anti Hit (حماية من الضرب)",
-   CurrentValue = false,
-   Callback = function(Value)
-      AntiHitEnabled = Value
-      task.spawn(function()
-         while AntiHitEnabled do
-            pcall(function()
-               if LocalPlayer.Character then
-                  for _, part in pairs(LocalPlayer.Character:GetChildren()) do
-                     if part:IsA("BasePart") then
-                        part.CanTouch = not AntiHitEnabled
-                     end
-                  end
-               end
-            end)
-            task.wait(0.2)
-         end
-      end)
-   end,
-})
-
--- ESP Tab
-local ESPTab = Window:CreateTab("كشف البيض (ESP)", 4483362458)
-
-local function ClearESP()
-   for _, esp in pairs(ESPObjects) do
-      if esp and esp.Parent then
-         esp:Destroy()
-      end
-   end
-   ESPObjects = {}
+-- تنفيذ الانتقال
+local function executeTeleport(targetJobId)
+    local queueFunc = queue_on_teleport or syn.queue_on_teleport or queueonteleport
+    if queueFunc then
+        queueFunc(string.format('loadstring(game:HttpGet("%s"))()', github_raw_url))
+    end
+    
+    if targetJobId then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, targetJobId, LocalPlayer)
+    else
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end
 end
 
--- تصفية الأجسام للتأكد من أنها بيضة حقيقية وليست خريطة/آلة
-local function IsValidEgg(obj)
-   local name = obj.Name:lower()
-   -- استبعاد المباني والمعدات والآلات
-   if name:find("treadmill") or name:find("machine") or name:find("fuse") or name:find("cube") or name:find("cylinder") or name:find("fence") then
-      return false
-   end
-   -- التأكد أنها بيضة أو موديل حيوان
-   if name:find("egg") or obj:FindFirstChild("Egg") or obj:GetAttribute("Weight") then
-      return true
-   end
-   return false
+-- دالة التنقل بين السيرفرات
+local function serverHop()
+    statusLabel.Text = "🔄 جاري البحث عن سيرفر جديد..."
+    statusLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+    
+    task.spawn(function()
+        local placeId = game.PlaceId
+        local currentJobId = game.JobId
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet("https://games.roproxy.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        end)
+
+        local targetServer = nil
+        if success and result and result.data then
+            local validServers = {}
+            for _, s in ipairs(result.data) do
+                if type(s) == "table" and s.id ~= currentJobId and s.playing < s.maxPlayers then
+                    table.insert(validServers, s.id)
+                end
+            end
+            if #validServers > 0 then
+                targetServer = validServers[math.random(1, #validServers)]
+            end
+        end
+
+        executeTeleport(targetServer)
+    end)
 end
 
-local function GetEggData(egg)
-   local rawName = egg.Name:lower()
-   local cleanName = rawName:gsub("egg", ""):gsub("sit", ""):gsub("bottom", ""):gsub("point", ""):gsub("_", " "):gsub("^%s*(.-)%s*$", "%1")
-   
-   local rarity = "Common"
-   local color = Color3.fromRGB(220, 220, 220)
+manualHopBtn.MouseButton1Click:Connect(serverHop)
 
-   for key, data in pairs(RarityDatabase) do
-      if cleanName:find(key) then
-         rarity = data.Rarity
-         color = data.Color
-         cleanName = key:gsub("^%l", string.upper)
-         break
-      end
-   end
+-- دالة قراءة الوقت المتبقي المباشر من واجهة اللعبة
+local function getExactGameTimeLeft()
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if playerGui then
+        for _, guiElement in ipairs(playerGui:GetDescendants()) do
+            if guiElement:IsA("TextLabel") or guiElement:IsA("TextButton") then
+                local txt = guiElement.Text
+                local m, s = string.match(txt, "(%d+)m%s*(%d+)s")
+                if m and s then
+                    return tonumber(m) * 60 + tonumber(s)
+                end
+                local m2, s2 = string.match(txt, "(%d+):(%d+)")
+                if m2 and s2 and tonumber(m2) <= 5 then
+                    return tonumber(m2) * 60 + tonumber(s2)
+                end
+            end
+        end
+    end
 
-   local weight = egg:GetAttribute("Weight") or (egg:FindFirstChild("Weight") and egg.Weight.Value) or "غير محدد"
-   local price = egg:GetAttribute("Price") or (egg:FindFirstChild("Price") and egg.Price.Value) or "غير محدد"
-
-   return cleanName, weight, price, rarity, color
+    local serverTime = math.floor(Workspace:GetServerTimeNow())
+    return 300 - (serverTime % 300)
 end
 
-local function UpdateEggESP()
-   if not EggESPEnabled then return end
-   
-   local char = LocalPlayer.Character
-   if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-   local hrp = char.HumanoidRootPart
+-- دالة الفحص عبر الشات وأسماء المجسمات فقط
+local function check1BPetAccurate()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("BasePart") then
+            local objName = string.lower(obj.Name)
+            for _, petName in ipairs(HighTier1BPets) do
+                if string.find(objName, petName) then
+                    return "الحيوان: " .. obj.Name
+                end
+            end
+        end
+    end
 
-   for _, obj in pairs(workspace:GetDescendants()) do
-      if IsValidEgg(obj) and (obj:IsA("BasePart") or obj:IsA("Model")) then
-         local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
-         if part then
-            local dist = (hrp.Position - part.Position).Magnitude
-            local billboard = part:FindFirstChild("EggInfoUI")
+    local chatGui = LocalPlayer.PlayerGui:FindFirstChild("Chat") or CoreGui:FindFirstChild("Chat")
+    if chatGui then
+        for _, label in ipairs(chatGui:GetDescendants()) do
+            if label:IsA("TextLabel") then
+                local txt = string.lower(label.Text)
+                for _, kw in ipairs(RareSpawnKeywords) do
+                    if string.find(txt, kw) then
+                        return "الشات: " .. label.Text
+                    end
+                end
+            end
+        end
+    end
 
-            if dist <= MaxDistance then
-               if not billboard then
-                  billboard = Instance.new("BillboardGui")
-                  billboard.Name = "EggInfoUI"
-                  billboard.Adornee = part
-                  billboard.Size = UDim2.new(0, 180, 0, 55)
-                  billboard.StudsOffset = Vector3.new(0, 3, 0)
-                  billboard.AlwaysOnTop = true
+    return nil
+end
 
-                  local textLabel = Instance.new("TextLabel")
-                  textLabel.Name = "Label"
-                  textLabel.Parent = billboard
-                  textLabel.Size = UDim2.new(1, 0, 1, 0)
-                  textLabel.BackgroundTransparency = 1
-                  textLabel.TextSize = 11
-                  textLabel.Font = Enum.Font.SourceSansBold
-                  textLabel.TextStrokeTransparency = 0.2
+-- نافذة السؤال المنبثقة للـ Server Hop
+local function showPrompt()
+    local promptFrame = Instance.new("Frame")
+    promptFrame.Name = "PromptFrame"
+    promptFrame.Size = UDim2.new(0, 280, 0, 150)
+    promptFrame.Position = UDim2.new(0.5, -140, 0.4, 0)
+    promptFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+    promptFrame.Active = true
+    promptFrame.Draggable = true
+    promptFrame.Parent = screenGui
 
-                  billboard.Parent = part
-                  table.insert(ESPObjects, billboard)
-               end
+    local pCorner = Instance.new("UICorner")
+    pCorner.CornerRadius = UDim.new(0, 12)
+    pCorner.Parent = promptFrame
 
-               local name, weight, price, rarity, color = GetEggData(obj)
-               local label = billboard:FindFirstChild("Label")
-               if label then
-                  label.TextColor3 = color
-                  label.Text = string.format("🥚 %s\n⚖️ الوزن: %s | 💰 السعر: %s\n⭐ الندرة: %s", name, tostring(weight), tostring(price), tostring(rarity))
-               end
+    local pStroke = Instance.new("UIStroke")
+    pStroke.Color = Color3.fromRGB(255, 170, 0)
+    pStroke.Thickness = 2
+    pStroke.Parent = promptFrame
+
+    local promptText = Instance.new("TextLabel")
+    promptText.Size = UDim2.new(0.9, 0, 0, 55)
+    promptText.Position = UDim2.new(0.05, 0, 0.1, 0)
+    promptText.BackgroundTransparency = 1
+    promptText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    promptText.TextSize = 13
+    promptText.TextWrapped = true
+    promptText.Font = Enum.Font.SourceSansBold
+    promptText.Parent = promptFrame
+
+    local yesBtn = Instance.new("TextButton")
+    yesBtn.Size = UDim2.new(0.42, 0, 0, 38)
+    yesBtn.Position = UDim2.new(0.05, 0, 0.62, 0)
+    yesBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+    yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    yesBtn.Text = "نعم 🚀"
+    yesBtn.TextSize = 14
+    yesBtn.Font = Enum.Font.SourceSansBold
+    yesBtn.Parent = promptFrame
+
+    local yesCorner = Instance.new("UICorner")
+    yesCorner.CornerRadius = UDim.new(0, 8)
+    yesCorner.Parent = yesBtn
+
+    local noBtn = Instance.new("TextButton")
+    noBtn.Size = UDim2.new(0.42, 0, 0, 38)
+    noBtn.Position = UDim2.new(0.53, 0, 0.62, 0)
+    noBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    noBtn.Text = "لا ❌"
+    noBtn.TextSize = 14
+    noBtn.Font = Enum.Font.SourceSansBold
+    noBtn.Parent = promptFrame
+
+    local noCorner = Instance.new("UICorner")
+    noCorner.CornerRadius = UDim.new(0, 8)
+    noCorner.Parent = noBtn
+
+    local userChoice = nil
+
+    yesBtn.MouseButton1Click:Connect(function()
+        if userChoice == nil then
+            userChoice = "yes"
+            promptFrame:Destroy()
+        end
+    end)
+
+    noBtn.MouseButton1Click:Connect(function()
+        if userChoice == nil then
+            userChoice = "no"
+            promptFrame:Destroy()
+        end
+    end)
+
+    task.spawn(function()
+        for i = 10, 1, -1 do
+            if userChoice ~= nil then break end
+            promptText.Text = "لم يترسبن حيوان نادر!\nهل تريد الانتقال لسيرفر آخر؟\n(" .. i .. " ثوانٍ)"
+            task.wait(1)
+        end
+        if userChoice == nil then
+            userChoice = "no"
+            if promptFrame and promptFrame.Parent then
+                promptFrame:Destroy()
+            end
+        end
+    end)
+
+    repeat task.wait(0.2) until userChoice ~= nil
+    return userChoice
+end
+
+-- الحلقة الرئيسية التكرارية التي تعمل بدون توقف عند البقاء
+task.spawn(function()
+    while true do
+        local timeLeft = getExactGameTimeLeft()
+        
+        while timeLeft > 1 do
+            timeLeft = getExactGameTimeLeft()
+            local mins = math.floor(timeLeft / 60)
+            local secs = timeLeft % 60
+            statusLabel.Text = string.format("⏳ باقي على رسبون اللعبة:\n%02d:%02d", mins, secs)
+            statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+            task.wait(0.5)
+        end
+
+        statusLabel.Text = "⚡ رسبن الماب الآن! جاري فحص الشات..."
+        statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+        task.wait(2.5)
+
+        local foundPet = check1BPetAccurate()
+
+        if foundPet then
+            statusLabel.Text = "🎉 تم العثور على حيوان نادر!\n" .. foundPet
+            statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+            break -- التوقف فقط إذا تم العثور على حيوان نادر بنجاح
+        else
+            statusLabel.Text = "❌ لم يترسبن حيوان نادر."
+            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            
+            local choice = showPrompt()
+            if choice == "yes" then
+                serverHop()
+                break
             else
-               if billboard then
-                  billboard:Destroy()
-               end
+                statusLabel.Text = "👍 البقاء بالسيرفر.. جاري استئناف العداد"
+                statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+                task.wait(2)
+                -- يستمر Loop تلقائياً للرسبون القادم
             end
-         end
-      end
-   end
-end
-
-ESPTab:CreateToggle({
-   Name = "ESP Egg (كشف القرب التلقائي)",
-   CurrentValue = false,
-   Callback = function(Value)
-      EggESPEnabled = Value
-      if not Value then
-         ClearESP()
-      else
-         task.spawn(function()
-            while EggESPEnabled do
-               pcall(UpdateEggESP)
-               task.wait(0.3)
-            end
-         end)
-      end
-   end,
-})
-
-ESPTab:CreateSlider({
-   Name = "مسافة الكشف عند القرب",
-   Range = {10, 100},
-   Increment = 5,
-   Suffix = "Studs",
-   CurrentValue = 30,
-   Callback = function(Value)
-      MaxDistance = Value
-   end,
-})
-
-Rayfield:Notify({
-   Title = "Egg Steal Script",
-   Content = "تم إصلاح الـ ESP والسرعة بنجاح!",
-   Duration = 3,
-   Image = 4483362458,
-})
+        end
+    end
+end)
